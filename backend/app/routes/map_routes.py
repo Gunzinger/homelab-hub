@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from ipaddress import ip_address, ip_network, AddressValueError
 
 from ..models import (
-    db, Hardware, VM, AppService, Storage, Network, Misc,
+    db, Hardware, VM, AppService, Storage, Network, Misc, Share,
     NetworkMember, Relationship, MapLayout, MapEdge,
 )
 
@@ -137,6 +137,38 @@ def get_graph():
                     "label": "storage",
                 }
             })
+
+    # Add shares as nodes and edges from storage to shares
+    for share in Share.query.all():
+        # Create share node
+        node_data = {
+            "id": f"shares-{share.id}",
+            "label": share.name,
+            "type": "shares",
+            "entity_id": share.id,
+            "rawName": share.name,
+            "rank": 3,  # Same level as misc
+            "shareType": share.share_type,
+        }
+        
+        # Add network membership if share has an IP
+        if share.ip:
+            network = get_network_for_ip(share.ip)
+            if network:
+                node_data["networkId"] = network.id
+                node_data["networkName"] = network.name
+                node_data["networkColor"] = network.color or "#E74C3C"
+        
+        nodes.append({"data": node_data})
+        
+        # Create edge from storage to share
+        edges.append({
+            "data": {
+                "source": f"storage-{share.storage_id}",
+                "target": f"shares-{share.id}",
+                "label": share.share_type or "share",
+            }
+        })
 
     # Skip network membership edges since networks aren't nodes anymore
 

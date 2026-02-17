@@ -1,6 +1,6 @@
 <script>
   import { onMount, createEventDispatcher } from "svelte";
-  import { get, post, put } from "../../lib/api.js";
+  import { get, post, put, del } from "../../lib/api.js";
   import { addToast } from "../../lib/stores.js";
   import HardwareForm from "./HardwareForm.svelte";
   import VmForm from "./VmForm.svelte";
@@ -8,6 +8,7 @@
   import StorageForm from "./StorageForm.svelte";
   import NetworkForm from "./NetworkForm.svelte";
   import MiscForm from "./MiscForm.svelte";
+  import ShareList from "./ShareList.svelte";
 
   export let type;
   export let id = null;
@@ -16,6 +17,9 @@
 
   let item = {};
   let loading = !!id;
+  let shares = [];
+  let parentIp = '';
+  let parentHostname = '';
 
   const FORMS = {
     hardware: HardwareForm,
@@ -33,6 +37,20 @@
       try {
         const res = await get(`/${type}/${id}`);
         item = res.data;
+        if (type === 'storage' && item.shares) {
+          shares = item.shares;
+          
+          // Fetch grandparent (hardware or vm) details for default IP/hostname
+          if (item.hardware_id) {
+            const hwRes = await get(`/hardware/${item.hardware_id}`);
+            parentIp = hwRes.data.ip_address || '';
+            parentHostname = hwRes.data.hostname || '';
+          } else if (item.vm_id) {
+            const vmRes = await get(`/vms/${item.vm_id}`);
+            parentIp = vmRes.data.ip_address || '';
+            parentHostname = vmRes.data.hostname || '';
+          }
+        }
       } catch (e) {
         addToast(e.message, "error");
       }
@@ -50,6 +68,44 @@
         addToast("Created", "success");
       }
       dispatch("saved");
+    } catch (e) {
+      addToast(e.message, "error");
+    }
+  }
+
+  async function handleShareSave(event) {
+    try {
+      const shareData = event.detail;
+      
+      if (shareData.id) {
+        // Update existing share
+        await put(`/shares/${shareData.id}`, shareData);
+        addToast("Share updated", "success");
+      } else {
+        // Create new share
+        const result = await post('/shares', shareData);
+        addToast("Share created", "success");
+      }
+      
+      // Reload the storage item to get updated shares
+      const res = await get(`/${type}/${id}`);
+      item = res.data;
+      shares = item.shares || [];
+    } catch (e) {
+      addToast(e.message, "error");
+    }
+  }
+
+  async function handleShareDelete(event) {
+    try {
+      const share = event.detail;
+      await del(`/shares/${share.id}`);
+      addToast("Share deleted", "success");
+      
+      // Reload the storage item to get updated shares
+      const res = await get(`/${type}/${id}`);
+      item = res.data;
+      shares = item.shares || [];
     } catch (e) {
       addToast(e.message, "error");
     }
@@ -74,6 +130,17 @@
       </button>
     </div>
   </form>
+  
+  {#if type === 'storage' && id}
+    <ShareList 
+      {shares}
+      storageId={id}
+      {parentIp}
+      {parentHostname}
+      on:save={handleShareSave}
+      on:delete={handleShareDelete}
+    />
+  {/if}
 {/if}
 
 <style>

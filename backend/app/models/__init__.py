@@ -4,6 +4,7 @@ from .hardware import Hardware
 from .vm import VM
 from .app_service import AppService
 from .storage import Storage
+from .share import Share
 from .network import Network, NetworkMember
 from .misc import Misc
 from .map_layout import MapLayout, MapEdge, Relationship
@@ -16,6 +17,7 @@ __all__ = [
     "VM",
     "AppService",
     "Storage",
+    "Share",
     "Network",
     "NetworkMember",
     "Misc",

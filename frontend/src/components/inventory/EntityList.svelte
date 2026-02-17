@@ -2,14 +2,32 @@
   import { push } from "svelte-spa-router";
   import { get, post, del } from "../../lib/api.js";
   import { addToast } from "../../lib/stores.js";
-  import EntityDetail from "./EntityDetail.svelte";
+  import Modal from "../Modal.svelte";
+  import HardwareForm from "./HardwareForm.svelte";
+  import VmForm from "./VmForm.svelte";
+  import AppForm from "./AppForm.svelte";
+  import StorageForm from "./StorageForm.svelte";
+  import NetworkForm from "./NetworkForm.svelte";
+  import MiscForm from "./MiscForm.svelte";
 
   export let type = "hardware";
 
   let items = [];
   let loading = true;
   let search = "";
-  let showCreate = false;
+  let showCreateModal = false;
+  let newItem = {};
+  let sortColumn = null;
+  let sortDirection = 'asc';
+
+  const FORMS = {
+    hardware: HardwareForm,
+    vms: VmForm,
+    apps: AppForm,
+    storage: StorageForm,
+    networks: NetworkForm,
+    misc: MiscForm,
+  };
 
   const COLUMNS = {
     hardware: ["name", "hostname", "ip_address", "os", "cpu", "ram_gb"],
@@ -37,6 +55,8 @@
   }
 
   $: columns = COLUMNS[type] || ["name"];
+  $: FormComponent = FORMS[type];
+  $: modalTitle = `Add ${type.charAt(0).toUpperCase() + type.slice(1).replace(/s$/, "")}`;
 
   async function loadItems() {
     loading = true;
@@ -60,6 +80,37 @@
         )
       )
     : items;
+
+  function sortBy(column) {
+    if (sortColumn === column) {
+      // Toggle direction if clicking same column
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      // New column, default to ascending
+      sortColumn = column;
+      sortDirection = 'asc';
+    }
+  }
+
+  $: sorted = sortColumn
+    ? [...filtered].sort((a, b) => {
+        let aVal = a[sortColumn];
+        let bVal = b[sortColumn];
+        
+        // Handle null/undefined values
+        if (aVal == null) aVal = '';
+        if (bVal == null) bVal = '';
+        
+        // Convert to strings for comparison if not numbers
+        if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+        if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+        
+        // Compare
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      })
+    : filtered;
 
   async function deleteItem(id) {
     if (!confirm("Delete this item?")) return;
@@ -89,9 +140,26 @@
     }
   }
 
-  function handleSaved() {
-    showCreate = false;
-    loadItems();
+  function handleAddClick() {
+    newItem = {};
+    showCreateModal = true;
+  }
+
+  function handleModalClose() {
+    showCreateModal = false;
+    newItem = {};
+  }
+
+  async function handleCreate() {
+    try {
+      await post(`/${type}`, newItem);
+      addToast("Created successfully", "success");
+      showCreateModal = false;
+      newItem = {};
+      loadItems();
+    } catch (e) {
+      addToast(e.message, "error");
+    }
   }
 </script>
 
@@ -100,15 +168,9 @@
     <h2>{type.charAt(0).toUpperCase() + type.slice(1)}</h2>
     <div class="actions">
       <input type="search" placeholder="Filter..." bind:value={search} />
-      <button on:click={() => (showCreate = true)}>+ Add</button>
+      <button on:click={handleAddClick}>+ Add</button>
     </div>
   </div>
-
-  {#if showCreate}
-    <div class="create-panel">
-      <EntityDetail {type} id={null} on:saved={handleSaved} on:cancel={() => (showCreate = false)} />
-    </div>
-  {/if}
 
   {#if loading}
     <p aria-busy="true">Loading...</p>
@@ -120,13 +182,18 @@
         <thead>
           <tr>
             {#each columns as col}
-              <th>{label(col)}</th>
+              <th class="sortable" on:click={() => sortBy(col)}>
+                {label(col)}
+                {#if sortColumn === col}
+                  <span class="sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+                {/if}
+              </th>
             {/each}
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {#each filtered as item (item.id)}
+          {#each sorted as item (item.id)}
             <tr on:click={() => push(`/inventory/${type}/${item.id}`)} class="clickable">
               {#each columns as col}
                 <td>{item[col] ?? ""}</td>
@@ -136,7 +203,7 @@
                   <button class="outline secondary small" on:click|stopPropagation={() => duplicateItem(item)}>
                     Duplicate
                   </button>
-                  <button class="outline secondary small" on:click|stopPropagation={() => deleteItem(item.id)}>
+                  <button class="outline secondary small btn-delete" on:click|stopPropagation={() => deleteItem(item.id)}>
                     Delete
                   </button>
                 </div>
@@ -148,6 +215,22 @@
     </div>
   {/if}
 </div>
+
+<Modal 
+  isOpen={showCreateModal} 
+  title={modalTitle}
+  maxWidth="700px"
+  on:close={handleModalClose}
+>
+  <form on:submit|preventDefault={handleCreate}>
+    <svelte:component this={FormComponent} bind:item={newItem} />
+    
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Create</button>
+      <button type="button" class="btn-secondary" on:click={handleModalClose}>Cancel</button>
+    </div>
+  </form>
+</Modal>
 
 <style>
   .list-header {
@@ -177,17 +260,26 @@
   .table-wrap {
     overflow-x: auto;
   }
+  th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 1.5rem;
+  }
+  th.sortable:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .sort-indicator {
+    position: absolute;
+    right: 0.5rem;
+    font-size: 0.7rem;
+    opacity: 0.7;
+  }
   tr.clickable {
     cursor: pointer;
   }
   tr.clickable:hover {
     background: var(--pico-primary-hover-background, rgba(255, 255, 255, 0.03));
-  }
-  .create-panel {
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    border: 1px solid var(--pico-muted-border-color, #333);
-    border-radius: 8px;
   }
   .small {
     padding: 0.25rem 0.5rem;
@@ -197,5 +289,56 @@
     display: flex;
     gap: 0.5rem;
     justify-content: flex-end;
+  }
+  
+  form {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #444;
+  }
+  
+  .btn-primary {
+    padding: 0.5rem 1rem;
+    background: #4a9eff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  
+  .btn-primary:hover {
+    background: #3a8eef;
+  }
+  
+  .btn-secondary {
+    padding: 0.5rem 1rem;
+    background: #444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  
+  .btn-secondary:hover {
+    background: #555;
+  }
+  
+  .btn-delete {
+    background: rgba(220, 53, 69, 0.15) !important;
+    border-color: rgba(220, 53, 69, 0.3) !important;
+  }
+  
+  .btn-delete:hover {
+    background: rgba(220, 53, 69, 0.25) !important;
+    border-color: rgba(220, 53, 69, 0.5) !important;
   }
 </style>

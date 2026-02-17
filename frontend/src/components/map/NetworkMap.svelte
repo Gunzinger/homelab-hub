@@ -42,6 +42,7 @@
     vms:       { shape: "ellipse",          color: "#C8E6C9" },  // Pastel green
     apps:      { shape: "round-rectangle", color: "#FFE0B2" },  // Pastel orange
     storage:   { shape: "barrel",           color: "#E1BEE7" },  // Pastel purple
+    shares:    { shape: "round-tag",        color: "#FFF9C4" },  // Pastel yellow
     misc:      { shape: "diamond",          color: "#E0E0E0" },  // Light gray
   };
 
@@ -229,157 +230,97 @@
   function runDagreLayout() {
     if (!cy) return;
     
-    // Group nodes by rank to enforce hierarchy
-    const nodesByRank = { 0: [], 1: [], 2: [], 3: [] };
-    cy.nodes().forEach(node => {
-      const rank = node.data("rank") || 3;
-      nodesByRank[rank].push(node);
-    });
-    
-    const constraintEdges = [];
-    
-    // Add rank constraint edges
-    for (let rank = 0; rank < 3; rank++) {
-      const currentRank = nodesByRank[rank];
-      const nextRank = nodesByRank[rank + 1];
-      
-      if (currentRank.length > 0 && nextRank.length > 0) {
-        constraintEdges.push({
-          group: 'edges',
-          data: {
-            id: `constraint-${rank}-${rank+1}`,
-            source: currentRank[0].id(),
-            target: nextRank[0].id(),
-            isConstraint: true
-          },
-          classes: 'constraint-edge'
-        });
-      }
-    }
-    
-    // Add constraint edges to graph
-    cy.add(constraintEdges);
-    
+    // Run initial dagre layout to establish vertical positioning (hierarchy)
     cy.layout({
       name: "dagre",
-      rankDir: "TB",  // Top to bottom
-      nodeSep: 40,     // Horizontal spacing between nodes
-      rankSep: 120,    // Vertical spacing between ranks
-      edgeSep: 10,     // Spacing for edges
+      rankDir: "TB",
+      nodeSep: 20,
+      rankSep: 100,
       ranker: "network-simplex",
-      fit: false,      // Don't fit yet - we'll adjust positions first
-      padding: 30,     // Padding around graph
-      animate: false,  // No animation on initial layout
+      fit: false,
+      padding: 30,
+      animate: false,
     }).run();
     
-    // Post-process: reorder subtrees to put misc on left, without forcing gaps
-    const rank0Nodes = cy.nodes('[rank=0]');
-    const subtrees = [];
+    // Separate misc nodes from the main tree structure
+    const miscNodes = cy.nodes().filter(node => node.data('type') === 'misc');
+    const mainNodes = cy.nodes().filter(node => node.data('type') !== 'misc');
     
-    rank0Nodes.forEach(topNode => {
-      const descendants = new Set();
-      descendants.add(topNode.id());
+    // Find root nodes in main tree (nodes with no incoming edges, excluding misc)
+    const roots = mainNodes
+      .filter(node => node.indegree(false) === 0)
+      .sort((a, b) => a.position().x - b.position().x);
+    
+    let nextX = 0;
+    const nodeSpacing = 70; // Horizontal space between leaf nodes
+    const subtreeGap = 50; // Gap between separate tree hierarchies
+    
+    // Depth-first layout: children are evenly spaced, parents centered above
+    function layoutSubtree(node) {
+      // Get direct children, sorted by their original position (excluding misc)
+      const children = node.outgoers('node')
+        .filter(n => n.data('type') !== 'misc')
+        .sort((a, b) => a.position().x - b.position().x);
       
-      // BFS to find all descendants
-      const queue = [topNode];
-      const visited = new Set([topNode.id()]);
-      
-      while (queue.length > 0) {
-        const node = queue.shift();
-        const children = node.outgoers('node');
-        children.forEach(child => {
-          if (!visited.has(child.id())) {
-            visited.add(child.id());
-            descendants.add(child.id());
-            queue.push(child);
-          }
-        });
+      if (children.length === 0) {
+        // Leaf node - assign next available X position
+        const x = nextX;
+        nextX += nodeSpacing;
+        node.position({ x, y: node.position().y });
+        return x;
       }
       
-      // Calculate bounding box for this subtree (with proper 2D bounds)
-      let minX = Infinity, maxX = -Infinity;
-      let minY = Infinity, maxY = -Infinity;
-      let topNodeX = 0;
+      // Recursively layout all children depth-first
+      const childXPositions = children.map(child => layoutSubtree(child));
       
-      descendants.forEach(nodeId => {
-        const node = cy.getElementById(nodeId);
-        const pos = node.position();
-        const width = node.width();
-        const height = node.height();
-        
-        minX = Math.min(minX, pos.x - width/2);
-        maxX = Math.max(maxX, pos.x + width/2);
-        minY = Math.min(minY, pos.y - height/2);
-        maxY = Math.max(maxY, pos.y + height/2);
-        
-        if (nodeId === topNode.id()) {
-          topNodeX = pos.x;
-        }
-      });
+      // Center this node over its children
+      const avgX = childXPositions.reduce((sum, x) => sum + x, 0) / childXPositions.length;
+      node.position({ x: avgX, y: node.position().y });
       
-      subtrees.push({
-        topNode,
-        descendants,
-        minX,
-        maxX,
-        minY,
-        maxY,
-        width: maxX - minX,
-        height: maxY - minY,
-        topNodeX
-      });
-    });
+      return avgX;
+    }
     
-    // Separate misc nodes from others and put misc on the left
-    const miscSubtrees = subtrees.filter(s => s.topNode.data('type') === 'misc');
-    const otherSubtrees = subtrees.filter(s => s.topNode.data('type') !== 'misc');
-    
-    // Sort each group by top node position
-    miscSubtrees.sort((a, b) => a.topNodeX - b.topNodeX);
-    otherSubtrees.sort((a, b) => a.topNodeX - b.topNodeX);
-    
-    // Combine with misc first (leftmost)
-    const reorderedSubtrees = [...miscSubtrees, ...otherSubtrees];
-    
-    // Only reposition if there are actual overlaps
-    const nodeSize = 50; // Approximate node size
-    let currentX = 0;
-    
-    reorderedSubtrees.forEach((subtree, idx) => {
-      if (idx === 0) {
-        // First subtree stays in place
-        currentX = subtree.maxX;
-      } else {
-        // Check if current subtree overlaps with previous position
-        if (subtree.minX < currentX + 10) {
-          // There's overlap, shift this subtree
-          const shift = (currentX + 10) - subtree.minX;
-          
-          subtree.descendants.forEach(nodeId => {
-            const node = cy.getElementById(nodeId);
-            const pos = node.position();
-            node.position({ x: pos.x + shift, y: pos.y });
-          });
-          
-          // Update bounds
-          subtree.minX += shift;
-          subtree.maxX += shift;
-        }
-        currentX = subtree.maxX;
+    // Layout each root tree
+    roots.forEach((root, idx) => {
+      if (idx > 0) {
+        nextX += subtreeGap; // Add gap between separate trees
       }
+      layoutSubtree(root);
     });
     
-    // Now fit the graph to viewport with animation
-    cy.fit(30);
-    cy.animate({
-      fit: { padding: 30 },
-      duration: 300
+    // Center the main tree in viewport
+    const mainX = mainNodes.map(n => n.position().x);
+    const minMainX = Math.min(...mainX);
+    const maxMainX = Math.max(...mainX);
+    const mainWidth = maxMainX - minMainX;
+    const centerShift = -(minMainX + maxMainX) / 2;
+    
+    mainNodes.forEach(node => {
+      const pos = node.position();
+      node.position({ x: pos.x + centerShift, y: pos.y });
     });
     
-    // Remove constraint edges after layout
-    setTimeout(() => {
-      cy.filter('.constraint-edge').remove();
-    }, 350);
+    // Layout misc nodes on the right in a compact grid
+    if (miscNodes.length > 0) {
+      const miscGap = 100; // Gap between main tree and misc section
+      const miscStartX = maxMainX + centerShift + miscGap;
+      const miscSpacingX = 80;
+      const miscSpacingY = 80;
+      const miscColumns = 2; // Number of columns for misc nodes
+      
+      // Sort misc nodes by their original Y position to maintain some order
+      const sortedMisc = miscNodes.toArray().sort((a, b) => a.position().y - b.position().y);
+      
+      sortedMisc.forEach((node, idx) => {
+        const col = idx % miscColumns;
+        const row = Math.floor(idx / miscColumns);
+        const x = miscStartX + col * miscSpacingX;
+        const y = 100 + row * miscSpacingY; // Start from top
+        node.position({ x, y });
+      });
+    }
+    
+    cy.fit(50);
   }
 
   function debounceSaveLayout() {
@@ -449,10 +390,10 @@
             <span class="info-value">{selectedNodeDetails.hostname}</span>
           </div>
         {/if}
-        {#if selectedNodeDetails.ip_address}
+        {#if selectedNodeDetails.ip_address || selectedNodeDetails.ip}
           <div class="info-item">
             <span class="info-label">IP Address:</span>
-            <span class="info-value">{selectedNodeDetails.ip_address}</span>
+            <span class="info-value">{selectedNodeDetails.ip_address || selectedNodeDetails.ip}</span>
           </div>
         {/if}
         {#if selectedNodeDetails.os}
@@ -551,6 +492,12 @@
             <span class="network-indicator" style="background-color: {selectedNode.networkColor}"></span>
             {selectedNode.networkName}
           </span>
+        </div>
+      {/if}
+      {#if selectedNodeDetails && selectedNodeDetails.share_type}
+        <div class="info-item">
+          <span class="info-label">Share Type:</span>
+          <span class="info-value">{selectedNodeDetails.share_type}</span>
         </div>
       {/if}
       {#if selectedNodeDetails && selectedNodeDetails.notes}

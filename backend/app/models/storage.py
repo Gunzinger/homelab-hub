@@ -17,9 +17,17 @@ class Storage(BaseMixin, db.Model):
     icon = db.Column(db.Text)
     notes = db.Column(db.Text)
 
+    # Relationship to shares
+    shares = db.relationship("Share", back_populates="storage", cascade="all, delete-orphan")
+
     __table_args__ = (
         db.CheckConstraint(
             "NOT (hardware_id IS NOT NULL AND vm_id IS NOT NULL)",
             name="ck_storage_single_parent",
         ),
     )
+
+    def to_dict(self):
+        result = super().to_dict()
+        result['shares'] = [share.to_dict() for share in self.shares]
+        return result

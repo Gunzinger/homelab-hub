@@ -164,10 +164,10 @@
                 <span class="info-value">{selectedNodeDetails.hostname}</span>
               </div>
             {/if}
-            {#if selectedNodeDetails.ip_address}
+            {#if selectedNodeDetails.ip_address || selectedNodeDetails.ip}
               <div class="info-item">
                 <span class="info-label">IP Address:</span>
-                <span class="info-value">{selectedNodeDetails.ip_address}</span>
+                <span class="info-value">{selectedNodeDetails.ip_address || selectedNodeDetails.ip}</span>
               </div>
             {/if}
             {#if selectedNodeDetails.os}
@@ -268,6 +268,12 @@
               </span>
             </div>
           {/if}
+          {#if selectedNodeDetails && selectedNodeDetails.share_type}
+            <div class="info-item">
+              <span class="info-label">Share Type:</span>
+              <span class="info-value">{selectedNodeDetails.share_type}</span>
+            </div>
+          {/if}
           {#if selectedNodeDetails && selectedNodeDetails.notes}
             <div class="info-item notes">
               <span class="info-label">Notes:</span>
@@ -321,7 +327,7 @@
   
   .info-panel {
     position: fixed;
-    top: 60px;
+    top: 200px;
     right: 20px;
     width: 320px;
     background: var(--pico-card-background-color, #1e1e2e);
@@ -329,7 +335,7 @@
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     z-index: 1000;
-    max-height: calc(100vh - 100px);
+    max-height: calc(100vh - 240px);
     display: flex;
     flex-direction: column;
   }

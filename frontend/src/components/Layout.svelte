@@ -1,8 +1,8 @@
 <script>
   import Sidebar from "./Sidebar.svelte";
 
-  // Backend URL - use relative path for dev (proxied), or explicit URL for production
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  // In production (Docker), use relative URLs. In dev, use explicit URL for proxy.
+  const API_BASE = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5001');
 
   async function exportDatabase() {
     try {

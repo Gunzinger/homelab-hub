@@ -27,9 +27,6 @@
 </script>
 
 <nav class="sidebar">
-  <div class="sidebar-header">
-    <h2>HomeLab Hub</h2>
-  </div>
   <ul class="nav-list">
     <li class="section">
       <div 
@@ -95,15 +92,7 @@
     position: sticky;
     top: 0;
   }
-  .sidebar-header {
-    padding: 1rem 1rem 1rem;
-    border-bottom: 1px solid var(--pico-muted-border-color, #333);
-    flex-shrink: 0;
-  }
-  .sidebar-header h2 {
-    margin: 0;
-    font-size: 1.2rem;
-  }
+  
   .nav-list {
     list-style: none;
     padding: 0.5rem 0;

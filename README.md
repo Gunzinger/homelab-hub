@@ -4,11 +4,15 @@ A self-hosted web application for managing and visualizing home lab infrastructu
 
 ## Features
 
-- **Inventory Management** — Full CRUD for hardware, VMs, apps/services, storage, networks, and miscellaneous items
+- **Inventory Management** — Full CRUD for hardware, VMs, apps/services, storage, networks, shares, and miscellaneous items
+- **Shares Management** — Track network shares (NFS, SMB, iSCSI, FTP, SFTP, WebDAV) under storage devices with auto-population of connection details
 - **Export/Import** — Backup and restore your entire inventory with one-click JSON export/import
-- **Network Visualization** — Interactive graph map showing relationships between infrastructure components (powered by Cytoscape.js)
+- **Network Visualization** — Interactive graph map with depth-first layout showing relationships between infrastructure components (powered by Cytoscape.js)
+- **Tree View** — Hierarchical view of your infrastructure with collapsible nodes
 - **Documentation** — Hierarchical markdown-based docs with live preview and auto-save
-- **Cross-Entity Search** — Search across all inventory types from a single interface
+- **Sortable Tables** — Click column headers to sort inventory data ascending or descending
+- **Cross-Entity Search** — Filter and search across all inventory types from a single interface
+- **Modal Dialogs** — Clean, accessible modal forms for creating and editing entities
 - **Relationship Tracking** — Automatic and manual relationship mapping between entities
 
 ## Tech Stack
@@ -155,6 +159,7 @@ All endpoints are prefixed with `/api/`.
 | VMs | `GET/POST /api/vms`, `GET/PUT/DELETE /api/vms/:id` |
 | Apps | `GET/POST /api/apps`, `GET/PUT/DELETE /api/apps/:id` |
 | Storage | `GET/POST /api/storage`, `GET/PUT/DELETE /api/storage/:id` |
+| Shares | `GET/POST /api/shares`, `GET/PUT/DELETE /api/shares/:id` |
 | Networks | `GET/POST /api/networks`, `GET/PUT/DELETE /api/networks/:id` |
 | Misc | `GET/POST /api/misc`, `GET/PUT/DELETE /api/misc/:id` |
 | Documents | `GET/POST /api/docs`, `GET/PUT/DELETE /api/docs/:id`, `PATCH /api/docs/:id/move` |
