@@ -35,7 +35,30 @@ A self-hosted web application for managing and visualizing home lab infrastructu
 ## Quick Start (Docker)
 
 ```bash
-docker compose up -d --build
+docker run -d \
+  --name homelab-hub \
+  -p 8000:8000 \
+  -v ./data:/data \
+  --restart unless-stopped \
+  raidowl/homelab-hub:latest
+```
+
+Or with Docker Compose — create a `docker-compose.yml`:
+
+```yaml
+services:
+  homelab-hub:
+    image: raidowl/homelab-hub:latest
+    container_name: homelab-hub
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
 ```
 
 The application will be available at `http://localhost:8000`.

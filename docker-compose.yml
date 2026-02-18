@@ -1,6 +1,6 @@
 services:
   homelab-hub:
-    build: .
+    image: raidowl/homelab-hub:latest
     container_name: homelab-hub
     ports:
       - "8000:8000"
