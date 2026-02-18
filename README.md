@@ -1,6 +1,8 @@
-# HomeLab Hub
+# Home Lab Hub
 
 A self-hosted web application for managing and visualizing home lab infrastructure. Track hardware, virtual machines, applications, storage, networks, and more — all in one place.
+
+![Home Lab Hub Screenshot](docs/screenshot.png)
 
 ## Features
 
@@ -47,7 +49,12 @@ Data is persisted in the `./data/` directory.
 ```bash
 cd backend
 python3 -m venv .venv
+
+# Linux/macOS
 source .venv/bin/activate
+# Windows
+.venv\Scripts\activate
+
 pip install -r requirements.txt
 python wsgi.py
 ```
