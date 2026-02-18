@@ -9,7 +9,7 @@
 
 <div class="map-page">
   <div class="map-header">
-    <h2>Network Map</h2>
+    <h2>Device Map</h2>
     <div class="header-controls">
       <div class="view-toggle">
         <button 
